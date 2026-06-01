@@ -1,0 +1,162 @@
+{
+  "info": {
+    "_postman_id": "tracuu-thue-2026",
+    "name": "Tracuu Thue 2026 API",
+    "description": "API for scraping tax information from masothue.com",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": ["{{base_url}}"],
+          "path": ["health"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search - Auto",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"query\":\"Google\",\"type\":\"auto\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/search/tax",
+          "host": ["{{base_url}}"],
+          "path": ["api", "search", "tax"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search - Enterprise Tax Code",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"query\":\"0100026580\",\"type\":\"enterpriseTax\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/search/tax",
+          "host": ["{{base_url}}"],
+          "path": ["api", "search", "tax"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search - Personal Tax Code",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"query\":\"0123456789\",\"type\":\"personalTax\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/search/tax",
+          "host": ["{{base_url}}"],
+          "path": ["api", "search", "tax"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search - Identity",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"query\":\"0123456789\",\"type\":\"identity\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/search/tax",
+          "host": ["{{base_url}}"],
+          "path": ["api", "search", "tax"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search - Enterprise Name",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"query\":\"FPT\",\"type\":\"enterpriseName\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/search/tax",
+          "host": ["{{base_url}}"],
+          "path": ["api", "search", "tax"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search - Legal Name",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"query\":\"Trương Gia Bình\",\"type\":\"legalName\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/search/tax",
+          "host": ["{{base_url}}"],
+          "path": ["api", "search", "tax"]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3001",
+      "type": "string"
+    }
+  ]
+}

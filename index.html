@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Test API - Tra cứu thuế</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --border: #e2e8f0;
+      --primary: #0f766e;
+      --primary-soft: #ccfbf1;
+      --danger: #b91c1c;
+      --danger-soft: #fee2e2;
+      --warn: #92400e;
+      --warn-soft: #fef3c7;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at 10% 10%, #ecfeff, var(--bg));
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    h2, h3 {
+      margin: 0 0 12px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 12px;
+    }
+
+    label {
+      display: block;
+      margin: 8px 0 6px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+      background: #fff;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .actions button {
+      width: auto;
+      min-width: 130px;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .summary {
+      margin-top: 14px;
+      border-radius: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      background: #fff;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .summary.ok {
+      background: var(--primary-soft);
+      border-color: #5eead4;
+    }
+
+    .summary.warn {
+      background: var(--warn-soft);
+      border-color: #fcd34d;
+      color: var(--warn);
+    }
+
+    .summary.error {
+      background: var(--danger-soft);
+      border-color: #fca5a5;
+      color: var(--danger);
+    }
+
+    .result-wrap {
+      margin-top: 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--border);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+      font-size: 13px;
+      word-break: break-word;
+    }
+
+    th {
+      background: #f1f5f9;
+      font-weight: 600;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 12px;
+      overflow: auto;
+      max-height: 360px;
+      margin: 0;
+      border: 1px solid #1e293b;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .actions {
+        flex-wrap: wrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="panel">
+      <h2>Test API tra cứu thuế</h2>
+      <p class="meta">Trang này đã cập nhật theo logic mới: chỉ trả kết quả khi đúng type có dữ liệu trên masothue.com.</p>
+
+      <div class="grid">
+        <div>
+          <label for="query">Mã số thuế / query</label>
+          <input id="query" value="049204000844" placeholder="Nhập mã số thuế, CMND, tên công ty...">
+        </div>
+        <div>
+          <label for="type">Kiểu tìm kiếm</label>
+          <select id="type">
+            <option value="auto">Tìm tự động (auto)</option>
+            <option value="enterpriseTax">Mã số thuế công ty (enterpriseTax)</option>
+            <option value="personalTax">Mã số thuế cá nhân (personalTax)</option>
+            <option value="identity">CMND / Căn cước (identity)</option>
+            <option value="enterpriseName">Tên công ty (enterpriseName)</option>
+            <option value="legalName">Giám đốc / Người đại diện (legalName)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top:6px">
+        <div id="page-container" style="display:none">
+          <label for="page">Trang (page)</label>
+          <select id="page">
+            <option value="1">Trang 1</option>
+          </select>
+        </div>
+        <div>
+          <label for="city">Lọc theo Tỉnh / Thành phố (city)</label>
+          <select id="city">
+            <option value="">Lọc theo Tỉnh / Thành phố</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="send" class="btn-primary">Gửi yêu cầu</button>
+        <button id="clear">Xóa kết quả</button>
+      </div>
+
+      <div id="summary" class="summary">Chưa có yêu cầu.</div>
+
+      <div class="result-wrap" id="result">
+        <!-- dynamic content -->
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:12px">
+      <h3>Kết quả JSON (raw)</h3>
+      <pre id="raw">(chưa có yêu cầu)</pre>
+    </div>
+  </div>
+
+  <script>
+    const sendBtn = document.getElementById('send');
+    const clearBtn = document.getElementById('clear');
+    const queryEl = document.getElementById('query');
+    const typeEl = document.getElementById('type');
+    const resultEl = document.getElementById('result');
+    const rawEl = document.getElementById('raw');
+    const summaryEl = document.getElementById('summary');
+    const pageState = { query: '', type: 'auto', page: 1, city: '' };
+
+    const LIST_COLUMNS_PRIORITY = [
+      'index',
+      'taxCode',
+      'personalTaxCode',
+      'identityNumber',
+      'enterpriseName',
+      'fullName',
+      'representative',
+      'address',
+      'status',
+      'href'
+    ];
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function formatDate(ts){
+      if(!ts) return '';
+      const d = new Date(ts);
+      if(isNaN(d)) return ts;
+      const pad = n => String(n).padStart(2,'0');
+      const YYYY = d.getFullYear();
+      const MM = pad(d.getMonth()+1);
+      const DD = pad(d.getDate());
+      const hh = pad(d.getHours());
+      const mm = pad(d.getMinutes());
+      const ss = pad(d.getSeconds());
+      return `${YYYY}-${MM}-${DD} ${hh}:${mm}:${ss}`;
+    }
+
+    function getPageEl() {
+      return document.getElementById('page');
+    }
+
+    function getPageContainerEl() {
+      return document.getElementById('page-container');
+    }
+
+    function getCityEl() {
+      return document.getElementById('city');
+    }
+
+    function parsePageFromHref(href) {
+      if (!href) return null;
+      try {
+        const url = new URL(href, 'https://masothue.com');
+        const p = Number(url.searchParams.get('page') || 1);
+        return Number.isInteger(p) && p > 0 ? p : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function populatePageSelect(meta) {
+      const pageEl = getPageEl();
+      const containerEl = getPageContainerEl();
+      const pages = Array.isArray(meta?.pages) ? meta.pages : [];
+
+      if (!pageEl || !containerEl) return;
+
+      const pageNumbers = pages
+        .map((item) => parsePageFromHref(item.href) || (/^\d+$/.test(item.text) ? Number(item.text) : null))
+        .filter((value) => Number.isInteger(value) && value > 0);
+
+      const uniquePages = Array.from(new Set(pageNumbers)).sort((a, b) => a - b);
+
+      if (uniquePages.length <= 1) {
+        containerEl.style.display = 'none';
+        pageEl.innerHTML = '<option value="1">Trang 1</option>';
+        pageEl.value = '1';
+        return;
+      }
+
+      pageEl.innerHTML = '';
+      uniquePages.forEach((pageNumber) => {
+        const option = document.createElement('option');
+        option.value = String(pageNumber);
+        option.textContent = `Trang ${pageNumber}`;
+        pageEl.appendChild(option);
+      });
+
+      const currentPage = Number(meta?.currentPage || 1);
+      pageEl.value = String(uniquePages.includes(currentPage) ? currentPage : uniquePages[0]);
+      containerEl.style.display = '';
+    }
+
+    function hydrateCityOptions(metaCities, selectedCity) {
+      const cityEl = getCityEl();
+      if (!cityEl) return;
+
+      cityEl.innerHTML = '';
+      const options = Array.isArray(metaCities) && metaCities.length
+        ? metaCities
+        : [{ value: '', label: 'Lọc theo Tỉnh / Thành phố', selected: true }];
+
+      options.forEach((c) => {
+        const op = document.createElement('option');
+        op.value = String(c.value || '');
+        op.textContent = c.label || (c.value ? `City ${c.value}` : 'Lọc theo Tỉnh / Thành phố');
+        cityEl.appendChild(op);
+      });
+
+      cityEl.value = String(selectedCity || '');
+    }
+
+    function renderDetailFields(record){
+      const fields = record?.fields;
+      if(!fields || typeof fields !== 'object') return '<p class="meta">Không có trường fields cho bản ghi này.</p>';
+
+      let html = '<table><thead><tr><th style="width:35%">Trường</th><th>Thông tin</th></tr></thead><tbody>';
+      for(const key of Object.keys(fields)) {
+        const raw = fields[key];
+        const value = Array.isArray(raw) ? raw.join(' | ') : String(raw ?? '');
+        html += `<tr><td>${escapeHtml(key)}</td><td>${escapeHtml(value)}</td></tr>`;
+      }
+      html += '</tbody></table>';
+      return html;
+    }
+
+    function collectColumns(results) {
+      const cols = new Set();
+      results.forEach(item => {
+        Object.keys(item || {}).forEach(k => {
+          if (k !== 'fields' && k !== 'details') cols.add(k);
+        });
+      });
+
+      const ordered = [];
+      LIST_COLUMNS_PRIORITY.forEach(k => {
+        if (cols.has(k)) {
+          ordered.push(k);
+          cols.delete(k);
+        }
+      });
+
+      return [...ordered, ...Array.from(cols)];
+    }
+
+    function renderListResults(results) {
+      if (!Array.isArray(results) || results.length === 0) {
+        return '<p class="meta">Không có dữ liệu danh sách.</p>';
+      }
+
+      const columns = collectColumns(results);
+      if (columns.length === 0) {
+        return '<p class="meta">Dữ liệu trả về không có cột hiển thị.</p>';
+      }
+
+      let html = '<table><thead><tr>';
+      columns.forEach(col => {
+        html += `<th>${escapeHtml(col)}</th>`;
+      });
+      html += '</tr></thead><tbody>';
+
+      results.forEach(row => {
+        html += '<tr>';
+        columns.forEach(col => {
+          const raw = row[col];
+          const value = Array.isArray(raw) ? raw.join(', ') : String(raw ?? '');
+          html += `<td>${escapeHtml(value)}</td>`;
+        });
+        html += '</tr>';
+      });
+
+      html += '</tbody></table>';
+      return html;
+    }
+
+    function updateSummary({ query, reqType, resType, success, resultsCount, statusCode, noResults }) {
+      if (!success) {
+        summaryEl.className = 'summary error';
+        summaryEl.innerHTML = `
+          <strong>Yêu cầu lỗi</strong><br>
+          Query: <b>${escapeHtml(query)}</b>, Type gửi: <b>${escapeHtml(reqType)}</b><br>
+          HTTP: <b>${statusCode}</b>
+        `;
+        return;
+      }
+
+      if (noResults) {
+        summaryEl.className = 'summary warn';
+        summaryEl.innerHTML = `
+          <strong>Không có kết quả theo type</strong><br>
+          Query: <b>${escapeHtml(query)}</b>, Type gửi: <b>${escapeHtml(reqType)}</b>, Type phản hồi: <b>${escapeHtml(resType || reqType)}</b><br>
+          Số bản ghi: <b>${resultsCount}</b>
+        `;
+        return;
+      }
+
+      summaryEl.className = 'summary ok';
+      summaryEl.innerHTML = `
+        <strong>Tìm thấy dữ liệu</strong><br>
+        Query: <b>${escapeHtml(query)}</b>, Type gửi: <b>${escapeHtml(reqType)}</b>, Type phản hồi: <b>${escapeHtml(resType || reqType)}</b><br>
+        Số bản ghi: <b>${resultsCount}</b>
+      `;
+    }
+
+    async function send(opts = {}){
+      const query = queryEl.value.trim();
+      const type = typeEl.value;
+      const pageInput = Number(getPageEl()?.value || 1);
+      const page = Number.isInteger(pageInput) && pageInput > 0 ? pageInput : 1;
+      const city = String(getCityEl()?.value || '').trim();
+      const targetPage = opts.page && Number(opts.page) > 0 ? Number(opts.page) : page;
+      const targetCity = opts.city !== undefined ? String(opts.city || '') : city;
+
+      if(!query){ alert('Vui lòng nhập query.'); return; }
+      sendBtn.disabled = true; sendBtn.textContent = 'Đang gửi...';
+      rawEl.textContent = 'Đang chờ phản hồi...';
+      resultEl.innerHTML = '';
+      summaryEl.className = 'summary';
+      summaryEl.textContent = 'Đang gửi yêu cầu...';
+
+      pageState.query = query;
+      pageState.type = type;
+      pageState.page = targetPage;
+      pageState.city = targetCity;
+
+      if (getPageEl()) getPageEl().value = String(targetPage);
+
+      try{
+        const endpoint = targetPage > 1 ? 'http://localhost:3001/api/search/tax/page' : 'http://localhost:3001/api/search/tax';
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ query, type, page: targetPage, city: targetCity })
+        });
+        const json = await res.json();
+        rawEl.textContent = JSON.stringify(json, null, 2);
+
+        const results = Array.isArray(json.results) ? json.results : [];
+        const first = results[0] || null;
+        const hasFields = !!first?.fields;
+
+        updateSummary({
+          query,
+          reqType: type,
+          resType: json.type,
+          success: res.ok && !!json.success,
+          resultsCount: results.length,
+          statusCode: res.status,
+          noResults: results.length === 0
+        });
+
+        if (json?.meta) {
+          const cp = Number(json.meta.currentPage || targetPage);
+          if (getPageEl()) getPageEl().value = String(cp > 0 ? cp : targetPage);
+          hydrateCityOptions(json.meta.cities, json.meta.currentCity || targetCity);
+          populatePageSelect(json.meta);
+        }
+
+        if (!res.ok || !json.success) {
+          const msg = json.error || 'Lỗi không xác định';
+          resultEl.innerHTML = `<div class="summary error"><strong>Chi tiết lỗi:</strong> ${escapeHtml(msg)}</div>`;
+          return;
+        }
+
+        if (results.length === 0) {
+          resultEl.innerHTML = '<div class="meta">Masothue không trả dữ liệu cho query/type/page/city này, nên API trả rỗng đúng theo logic mới.</div>';
+          return;
+        }
+
+        if (results.length === 1 && hasFields) {
+          const title = first.title || first.enterpriseName || first.fullName || first.legalRepresentative || '';
+          const detailTable = renderDetailFields(first);
+          const updated = first.updatedAt || json.updatedAt;
+          resultEl.innerHTML = `
+            ${title ? `<h3 style="margin:4px 0">${escapeHtml(title)}</h3>` : ''}
+            <h3 style="margin:4px 0">Dữ liệu chi tiết</h3>
+            ${detailTable}
+          `;
+
+          if (updated) {
+            const meta = document.createElement('div');
+            meta.className = 'meta';
+            meta.textContent = `Cập nhật mã số thuế lần cuối vào ${formatDate(updated)}.`;
+            resultEl.appendChild(meta);
+          }
+          return;
+        }
+
+        resultEl.innerHTML = `<h3 style="margin:4px 0">Dữ liệu danh sách (${results.length})</h3>${renderListResults(results)}`;
+      }catch(err){
+        rawEl.textContent = String(err);
+        updateSummary({
+          query,
+          reqType: type,
+          resType: type,
+          success: false,
+          resultsCount: 0,
+          statusCode: 'NETWORK',
+          noResults: false
+        });
+        resultEl.innerHTML = `<div class="summary error"><strong>Lỗi:</strong> ${escapeHtml(err.message || String(err))}</div>`;
+      }finally{
+        sendBtn.disabled = false; sendBtn.textContent = 'Gửi yêu cầu';
+      }
+    }
+
+    sendBtn.addEventListener('click', send);
+    clearBtn.addEventListener('click', ()=>{
+      rawEl.textContent = '(chưa có yêu cầu)';
+      resultEl.innerHTML = '';
+      summaryEl.className = 'summary';
+      summaryEl.textContent = 'Chưa có yêu cầu.';
+    });
+
+    queryEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') send();
+    });
+
+    if (getCityEl()) {
+      getCityEl().addEventListener('change', () => {
+        if (getPageEl()) getPageEl().value = '1';
+      });
+    }
+
+    if (getPageEl()) {
+      getPageEl().addEventListener('change', () => {
+        const selectedPage = Number(getPageEl().value || 1);
+        if (Number.isInteger(selectedPage) && selectedPage > 0) {
+          send({ page: selectedPage });
+        }
+      });
+    }
+  </script>
+</body>
+</html>
