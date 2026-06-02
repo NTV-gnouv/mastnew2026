@@ -1,5 +1,6 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 const { parseSearchResults } = require('../utils/parser');
 
 const BASE_URL = 'https://masothue.com';
@@ -21,33 +22,7 @@ const DEFAULT_PROXY_URL = process.env.MASOTHUE_PROXY_URL
   || process.env.HTTP_PROXY
   || 'http://160.250.166.21:10984'
   || '';
-
-function parseProxyUrl(proxyUrl) {
-  if (!proxyUrl) return null;
-
-  try {
-    const url = new URL(proxyUrl);
-    if (!/^https?:$/.test(url.protocol)) {
-      return null;
-    }
-
-    return {
-      protocol: url.protocol.replace(':', ''),
-      host: url.hostname,
-      port: url.port ? Number(url.port) : (url.protocol === 'https:' ? 443 : 80),
-      auth: url.username
-        ? {
-            username: decodeURIComponent(url.username),
-            password: decodeURIComponent(url.password)
-          }
-        : undefined
-    };
-  } catch {
-    return null;
-  }
-}
-
-const DEFAULT_PROXY = parseProxyUrl(DEFAULT_PROXY_URL);
+const DEFAULT_PROXY_AGENT = DEFAULT_PROXY_URL ? new HttpsProxyAgent(DEFAULT_PROXY_URL) : null;
 
 const SCRAPE_ERROR_CODES = {
   CLOUDFLARE: 'CLOUDFLARE_CHALLENGE',
@@ -189,12 +164,14 @@ function buildTimeoutError(source = 'masothue.com') {
 }
 
 async function fetchUpstream(url, config = {}) {
-  const proxy = config.proxy === undefined ? (DEFAULT_PROXY || false) : config.proxy;
+  const proxyAgent = config.proxy === undefined ? DEFAULT_PROXY_AGENT : null;
   const response = await runWithConcurrencyLimit(() => axios.get(url, {
     headers: config.headers || DEFAULT_HEADERS,
     params: config.params,
     timeout: config.timeout || REQUEST_TIMEOUT_MS,
-    proxy,
+    proxy: false,
+    httpAgent: proxyAgent || undefined,
+    httpsAgent: proxyAgent || undefined,
     validateStatus: () => true
   }));
 
@@ -229,6 +206,18 @@ function isTimeoutError(error) {
   return code === 'ECONNABORTED' || code === SCRAPE_ERROR_CODES.TIMEOUT || message.includes('timeout');
 }
 
+function isTransientNetworkError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  const message = String(error?.message || '').toLowerCase();
+
+  return (
+    code === 'ECONNRESET' ||
+    code === 'EPIPE' ||
+    code === 'ETIMEDOUT' ||
+    message.includes('socket hang up')
+  );
+}
+
 function isCloudflareError(error) {
   const code = String(error?.code || '').toUpperCase();
   const message = String(error?.message || '').toLowerCase();
@@ -244,7 +233,7 @@ async function withRetry(task, attempts = 3) {
     } catch (error) {
       lastError = error;
 
-      if (!isRateLimitError(error) && !isTimeoutError(error)) {
+      if (!isRateLimitError(error) && !isTimeoutError(error) && !isTransientNetworkError(error)) {
         break;
       }
 
@@ -337,13 +326,10 @@ function inferDetailKind(record) {
   ) {
     return 'personal';
   }
-
   return 'enterprise';
 }
 
 function matchesRequestedType(record, type) {
-  if (type === 'auto') return true;
-
   const kind = inferDetailKind(record);
 
   if (type === 'personalTax' || type === 'identity') {
