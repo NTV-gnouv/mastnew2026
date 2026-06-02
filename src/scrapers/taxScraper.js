@@ -17,12 +17,13 @@ const DEFAULT_HEADERS = {
 const MAX_CONCURRENT_UPSTREAM = Number(process.env.MASOTHUE_MAX_CONCURRENT || 2);
 const CACHE_TTL_MS = Number(process.env.MASOTHUE_CACHE_TTL_MS || 30000);
 const REQUEST_TIMEOUT_MS = Number(process.env.MASOTHUE_REQUEST_TIMEOUT_MS || 20000);
+const DISABLE_PROXY = /^(1|true|yes|on)$/i.test(String(process.env.MASOTHUE_DISABLE_PROXY || ''));
 const DEFAULT_PROXY_URL = process.env.MASOTHUE_PROXY_URL
   || process.env.HTTPS_PROXY
   || process.env.HTTP_PROXY
   || 'http://160.250.166.21:10984'
   || '';
-const DEFAULT_PROXY_AGENT = DEFAULT_PROXY_URL ? new HttpsProxyAgent(DEFAULT_PROXY_URL) : null;
+const DEFAULT_PROXY_AGENT = !DISABLE_PROXY && DEFAULT_PROXY_URL ? new HttpsProxyAgent(DEFAULT_PROXY_URL) : null;
 
 const SCRAPE_ERROR_CODES = {
   CLOUDFLARE: 'CLOUDFLARE_CHALLENGE',

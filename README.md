@@ -165,11 +165,18 @@ PORT=3000
 NODE_ENV=development
 BASE_URL=https://masothue.com
 MASOTHUE_PROXY_URL=http://160.250.166.21:10984
+MASOTHUE_DISABLE_PROXY=false
 ```
 
 Nếu không muốn dùng biến riêng cho dự án, bạn cũng có thể đặt `HTTP_PROXY` hoặc `HTTPS_PROXY` theo cùng định dạng `http://host:port`.
 
 Lưu ý: proxy này áp dụng cho API scraper dùng `axios` trong `src/scrapers/taxScraper.js`. Nếu không khai báo gì thêm, dự án sẽ tự dùng proxy mặc định khi chạy `npm start`. File `chrome-proxy` và `browser-example.js` chỉ dành cho luồng chạy Chrome/Puppeteer.
+
+Để tắt proxy hoàn toàn và đi trực tiếp, đặt:
+
+```bash
+MASOTHUE_DISABLE_PROXY=true
+```
 
 ## Dependencies
 

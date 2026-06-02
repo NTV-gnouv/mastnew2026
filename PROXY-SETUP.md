@@ -24,6 +24,12 @@ BASE_URL=https://masothue.com
 MASOTHUE_PROXY_URL=http://160.250.166.21:10984
 ```
 
+To disable proxy and force a direct connection, set:
+
+```bash
+MASOTHUE_DISABLE_PROXY=true
+```
+
 If the proxy requires authentication, use the standard URL form:
 
 ```bash
