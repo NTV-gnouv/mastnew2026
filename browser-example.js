@@ -15,6 +15,7 @@ async function scrapWithProxy() {
     args: [
       '--start-maximized',
       '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
       '--disable-setuid-sandbox',
       '--no-first-run',
       '--no-default-browser-check'

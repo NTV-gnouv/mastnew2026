@@ -44,6 +44,20 @@ const browser = await puppeteer.launch({
 });
 ```
 
+#### Running as Root (VPS/Server)
+```javascript
+const browser = await puppeteer.launch({
+  headless: 'new',
+  executablePath: path.join(__dirname, 'chrome-proxy'),
+  args: [
+    '--no-sandbox',              // Required for root
+    '--disable-setuid-sandbox',  // Additional safety
+    '--disable-gpu',
+    '--disable-dev-shm-usage'    // Prevent /dev/shm errors
+  ]
+});
+```
+
 #### Run Example
 ```bash
 node browser-example.js
