@@ -10,7 +10,7 @@ const path = require('path');
 
 async function scrapWithProxy() {
   const browser = await puppeteer.launch({
-    headless: false,
+    headless: process.env.PUPPETEER_HEADFUL === '1' ? false : 'new',
     executablePath: path.join(__dirname, 'chrome-proxy'),
     args: [
       '--start-maximized',
