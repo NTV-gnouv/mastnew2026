@@ -1,0 +1,5 @@
+#!/bin/bash
+# Chrome wrapper with proxy support
+# Proxy: 160.250.166.21:10984
+exec /usr/bin/google-chrome "$@" \
+  --proxy-server=http://160.250.166.21:10984

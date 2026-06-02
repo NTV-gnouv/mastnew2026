@@ -463,7 +463,7 @@
       if (getPageEl()) getPageEl().value = String(targetPage);
 
       try{
-        const endpoint = targetPage > 1 ? 'http://localhost:3001/api/search/tax/page' : 'http://localhost:3001/api/search/tax';
+        const endpoint = targetPage > 1 ? 'https://tracuuthue.io.vn/api/search/tax/page' : 'https://tracuuthue.io.vn/api/search/tax';
         const res = await fetch(endpoint, {
           method: 'POST',
           headers: {'Content-Type':'application/json'},

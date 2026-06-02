@@ -95,24 +95,48 @@ async function handleSearch(req, res) {
     console.error('Search error:', error);
 
     const message = String(error?.message || '');
-    if (/cloudflare|chống bot|rate limit|giới hạn tần suất/i.test(message)) {
+    const code = String(error?.code || '').toUpperCase();
+    const status = Number(error?.status || error?.response?.status || 500);
+
+    if (code === 'CLOUDFLARE_CHALLENGE' || /cloudflare|chống bot/i.test(message)) {
       return res.status(503).json({
         success: false,
-        error: message,
-        retryAfterSeconds: 60
+        error: 'masothue.com đang hiển thị Cloudflare challenge; hãy thử lại sau',
+        code: 'CLOUDFLARE_CHALLENGE',
+        retryAfterSeconds: error.retryAfterSeconds || 60
       });
     }
 
-    if (/timeout/i.test(message)) {
+    if (code === 'RATE_LIMIT' || /rate limit|giới hạn tần suất/i.test(message)) {
+      return res.status(503).json({
+        success: false,
+        error: 'masothue.com đang giới hạn tần suất request; hãy thử lại sau',
+        code: 'RATE_LIMIT',
+        retryAfterSeconds: error.retryAfterSeconds || 60
+      });
+    }
+
+    if (code === 'TIMEOUT' || /timeout/i.test(message)) {
       return res.status(504).json({
         success: false,
-        error: message
+        error: 'Request tới masothue.com bị timeout',
+        code: 'TIMEOUT'
+      });
+    }
+
+    if (status === 503) {
+      return res.status(503).json({
+        success: false,
+        error: message || 'masothue.com hiện không khả dụng',
+        code: code || 'UPSTREAM_UNAVAILABLE',
+        retryAfterSeconds: error.retryAfterSeconds || 60
       });
     }
 
     res.status(500).json({
       success: false,
-      error: error.message || 'Search failed'
+      error: message || 'Search failed',
+      code: code || 'SEARCH_FAILED'
     });
   }
 }

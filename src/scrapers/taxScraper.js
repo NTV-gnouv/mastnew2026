@@ -17,6 +17,13 @@ const MAX_CONCURRENT_UPSTREAM = Number(process.env.MASOTHUE_MAX_CONCURRENT || 2)
 const CACHE_TTL_MS = Number(process.env.MASOTHUE_CACHE_TTL_MS || 30000);
 const REQUEST_TIMEOUT_MS = Number(process.env.MASOTHUE_REQUEST_TIMEOUT_MS || 20000);
 
+const SCRAPE_ERROR_CODES = {
+  CLOUDFLARE: 'CLOUDFLARE_CHALLENGE',
+  RATE_LIMIT: 'RATE_LIMIT',
+  TIMEOUT: 'TIMEOUT',
+  UPSTREAM_BLOCKED: 'UPSTREAM_BLOCKED'
+};
+
 let activeUpstreamRequests = 0;
 const upstreamQueue = [];
 const resultCache = new Map();
@@ -80,6 +87,19 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function createScrapeError(message, code, extras = {}) {
+  const error = new Error(message);
+  error.code = code;
+  error.status = extras.status || 500;
+  if (extras.retryAfterSeconds) {
+    error.retryAfterSeconds = extras.retryAfterSeconds;
+  }
+  if (extras.source) {
+    error.source = extras.source;
+  }
+  return error;
+}
+
 function isCloudflareChallengeHtml(html) {
   const text = String(html || '').toLowerCase();
   return (
@@ -87,13 +107,98 @@ function isCloudflareChallengeHtml(html) {
     text.includes('cloudflare') ||
     text.includes('verify you are human') ||
     text.includes('enable javascript and cookies') ||
-    text.includes('just a moment')
+    text.includes('just a moment') ||
+    text.includes('attention required') ||
+    text.includes('turnstile') ||
+    text.includes('cf-ray') ||
+    text.includes('ddos protection')
   );
 }
 
+function isCloudflareChallengeResponse(response) {
+  const status = response?.status;
+  const headers = response?.headers || {};
+  const server = String(headers.server || headers.Server || '').toLowerCase();
+  const hasCfRay = Boolean(headers['cf-ray'] || headers['Cf-Ray']);
+
+  if (status === 403 || status === 429 || status === 503) {
+    return true;
+  }
+
+  if (server.includes('cloudflare') || hasCfRay) {
+    return isCloudflareChallengeHtml(response?.data) || status === 403 || status === 429 || status === 503;
+  }
+
+  return isCloudflareChallengeHtml(response?.data);
+}
+
+function buildCloudflareError(source = 'masothue.com') {
+  return createScrapeError(
+    `${source} đang hiển thị Cloudflare challenge; tạm dừng để tránh gửi thêm request`,
+    SCRAPE_ERROR_CODES.CLOUDFLARE,
+    { status: 503, retryAfterSeconds: 60, source }
+  );
+}
+
+function buildRateLimitError(source = 'masothue.com') {
+  return createScrapeError(
+    `${source} đang giới hạn tần suất request; hãy chờ một lúc rồi thử lại`,
+    SCRAPE_ERROR_CODES.RATE_LIMIT,
+    { status: 503, retryAfterSeconds: 60, source }
+  );
+}
+
+function buildTimeoutError(source = 'masothue.com') {
+  return createScrapeError(
+    `Request tới ${source} bị timeout`,
+    SCRAPE_ERROR_CODES.TIMEOUT,
+    { status: 504, source }
+  );
+}
+
+async function fetchUpstream(url, config = {}) {
+  const response = await runWithConcurrencyLimit(() => axios.get(url, {
+    headers: config.headers || DEFAULT_HEADERS,
+    params: config.params,
+    timeout: config.timeout || REQUEST_TIMEOUT_MS,
+    validateStatus: () => true
+  }));
+
+  if (isCloudflareChallengeResponse(response)) {
+    throw buildCloudflareError();
+  }
+
+  if (response.status === 429) {
+    throw buildRateLimitError();
+  }
+
+  if (response.status === 403) {
+    throw createScrapeError(
+      'masothue.com từ chối request hiện tại',
+      SCRAPE_ERROR_CODES.UPSTREAM_BLOCKED,
+      { status: 503, retryAfterSeconds: 60, source: 'masothue.com' }
+    );
+  }
+
+  return response;
+}
+
 function isRateLimitError(error) {
-  const status = error?.response?.status;
-  return status === 429 || status === 503;
+  const status = error?.status || error?.response?.status;
+  const code = String(error?.code || '').toUpperCase();
+  return status === 429 || status === 503 || code === SCRAPE_ERROR_CODES.RATE_LIMIT;
+}
+
+function isTimeoutError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  const message = String(error?.message || '').toLowerCase();
+  return code === 'ECONNABORTED' || code === SCRAPE_ERROR_CODES.TIMEOUT || message.includes('timeout');
+}
+
+function isCloudflareError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  const message = String(error?.message || '').toLowerCase();
+  return code === SCRAPE_ERROR_CODES.CLOUDFLARE || message.includes('cloudflare challenge') || message.includes('chống bot');
 }
 
 async function withRetry(task, attempts = 3) {
@@ -105,7 +210,7 @@ async function withRetry(task, attempts = 3) {
     } catch (error) {
       lastError = error;
 
-      if (!isRateLimitError(error) && !String(error?.message || '').toLowerCase().includes('timeout')) {
+      if (!isRateLimitError(error) && !isTimeoutError(error)) {
         break;
       }
 
@@ -132,12 +237,20 @@ function getFinalUrl(response) {
 }
 
 function normalizeScrapeError(error) {
-  if (isRateLimitError(error)) {
-    return new Error('masothue.com đang giới hạn tần suất request; hãy giảm tốc độ hoặc chờ một lúc rồi thử lại');
+  if (isCloudflareError(error)) {
+    return buildCloudflareError();
   }
 
-  if (String(error?.message || '').toLowerCase().includes('timeout')) {
-    return new Error('Request tới masothue.com bị timeout');
+  if (isRateLimitError(error)) {
+    return buildRateLimitError();
+  }
+
+  if (isTimeoutError(error)) {
+    return buildTimeoutError();
+  }
+
+  if (error?.code && !error.status) {
+    error.status = 500;
   }
 
   return error;
@@ -215,27 +328,33 @@ function getExactDetailOverride(query) {
 }
 
 async function fetchToken() {
-  const pageResponse = await axios.get(BASE_URL, {
+  const pageResponse = await fetchUpstream(BASE_URL, {
     headers: DEFAULT_HEADERS,
     timeout: REQUEST_TIMEOUT_MS
   });
 
   const $page = cheerio.load(pageResponse.data);
-  return $page('input.token-search').val() || '';
+  const token = $page('input.token-search').val() || '';
+
+  if (!token) {
+    throw createScrapeError(
+      'Không lấy được token tìm kiếm từ masothue.com',
+      SCRAPE_ERROR_CODES.UPSTREAM_BLOCKED,
+      { status: 503, retryAfterSeconds: 60, source: 'masothue.com' }
+    );
+  }
+
+  return token;
 }
 
 async function fetchDetailPage(detailUrl, type, options = {}) {
-  const detailResp = await withRetry(() => runWithConcurrencyLimit(() => axios.get(detailUrl, {
+  const detailResp = await withRetry(() => fetchUpstream(detailUrl, {
     headers: {
       ...DEFAULT_HEADERS,
       Referer: SEARCH_ENDPOINT
     },
     timeout: REQUEST_TIMEOUT_MS
-  })));
-
-  if (isCloudflareChallengeHtml(detailResp.data)) {
-    throw new Error('masothue.com đang hiển thị chống bot Cloudflare; tạm dừng để tránh gửi thêm request');
-  }
+  }));
 
   const detailFinalUrl = getFinalUrl(detailResp);
   const detailParsed = parseSearchResults(detailResp.data, type, detailFinalUrl) || {
@@ -265,7 +384,7 @@ async function performSearch(query, type, token, options = {}) {
   const requestedPage = Number(options.page) > 0 ? Number(options.page) : 1;
   const requestedCity = String(options.city || '').trim();
 
-  const response = await withRetry(() => runWithConcurrencyLimit(() => axios.get(SEARCH_ENDPOINT, {
+  const response = await withRetry(() => fetchUpstream(SEARCH_ENDPOINT, {
     params: {
       q: query,
       type,
@@ -276,11 +395,7 @@ async function performSearch(query, type, token, options = {}) {
     },
     headers: DEFAULT_HEADERS,
     timeout: REQUEST_TIMEOUT_MS
-  })));
-
-  if (isCloudflareChallengeHtml(response.data)) {
-    throw new Error('masothue.com đang hiển thị chống bot Cloudflare; tạm dừng để tránh gửi thêm request');
-  }
+  }));
 
   const finalUrl = getFinalUrl(response);
   const rawHtml = response.data;
@@ -455,7 +570,12 @@ async function searchTax(query, type = 'auto', options = {}) {
   } catch (error) {
     const normalizedError = normalizeScrapeError(error);
     console.error('Search error:', normalizedError.message);
-    throw new Error(`Failed to search: ${normalizedError.message}`);
+    const wrappedError = new Error(`Failed to search: ${normalizedError.message}`);
+    wrappedError.code = normalizedError.code;
+    wrappedError.status = normalizedError.status;
+    wrappedError.retryAfterSeconds = normalizedError.retryAfterSeconds;
+    wrappedError.source = normalizedError.source;
+    throw wrappedError;
   }
 }
 
