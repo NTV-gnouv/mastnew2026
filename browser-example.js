@@ -10,13 +10,14 @@ const path = require('path');
 
 async function scrapWithProxy() {
   const browser = await puppeteer.launch({
-    headless: process.env.PUPPETEER_HEADFUL === '1' ? false : 'new',
-    executablePath: path.join(__dirname, 'chrome-proxy'),
+    headless: true,
+    executablePath: '/usr/bin/google-chrome',
     args: [
-      '--start-maximized',
-      '--disable-blink-features=AutomationControlled',
       '--no-sandbox',
-      '--disable-setuid-sandbox',
+      '--disable-gpu',
+      '--proxy-server=http://160.250.166.21:10984',
+      '--remote-debugging-port=9222',
+      `--user-data-dir=${path.join(__dirname, 'chrome-profile')}`,
       '--no-first-run',
       '--no-default-browser-check'
     ]
