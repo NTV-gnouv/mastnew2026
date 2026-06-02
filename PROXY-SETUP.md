@@ -4,6 +4,32 @@
 - **Proxy Server**: 160.250.166.21:10984
 - **Type**: HTTP
 
+## For the API Scraper
+
+The main API uses `axios` in `src/scrapers/taxScraper.js`, and the fixed proxy `http://160.250.166.21:10984` is now the default. You can still override it by setting one of these environment variables before starting the server:
+
+```bash
+MASOTHUE_PROXY_URL=http://160.250.166.21:10984
+# or
+HTTP_PROXY=http://160.250.166.21:10984
+# or
+HTTPS_PROXY=http://160.250.166.21:10984
+```
+
+Example `.env`:
+
+```bash
+PORT=3000
+BASE_URL=https://masothue.com
+MASOTHUE_PROXY_URL=http://160.250.166.21:10984
+```
+
+If the proxy requires authentication, use the standard URL form:
+
+```bash
+MASOTHUE_PROXY_URL=http://username:password@160.250.166.21:10984
+```
+
 ## Using chrome-proxy Wrapper
 
 ### File: `chrome-proxy`
@@ -66,6 +92,7 @@ node browser-example.js
 ### Current Project
 - **Scraper**: `src/scrapers/taxScraper.js` (uses axios)
 - **Server**: `src/server.js` (Express)
+- **Proxy support for API**: enabled via `MASOTHUE_PROXY_URL`, `HTTP_PROXY`, or `HTTPS_PROXY`
 
 ### If You Need to Add Puppeteer to taxScraper
 

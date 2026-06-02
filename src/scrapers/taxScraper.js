@@ -16,6 +16,38 @@ const DEFAULT_HEADERS = {
 const MAX_CONCURRENT_UPSTREAM = Number(process.env.MASOTHUE_MAX_CONCURRENT || 2);
 const CACHE_TTL_MS = Number(process.env.MASOTHUE_CACHE_TTL_MS || 30000);
 const REQUEST_TIMEOUT_MS = Number(process.env.MASOTHUE_REQUEST_TIMEOUT_MS || 20000);
+const DEFAULT_PROXY_URL = process.env.MASOTHUE_PROXY_URL
+  || process.env.HTTPS_PROXY
+  || process.env.HTTP_PROXY
+  || 'http://160.250.166.21:10984'
+  || '';
+
+function parseProxyUrl(proxyUrl) {
+  if (!proxyUrl) return null;
+
+  try {
+    const url = new URL(proxyUrl);
+    if (!/^https?:$/.test(url.protocol)) {
+      return null;
+    }
+
+    return {
+      protocol: url.protocol.replace(':', ''),
+      host: url.hostname,
+      port: url.port ? Number(url.port) : (url.protocol === 'https:' ? 443 : 80),
+      auth: url.username
+        ? {
+            username: decodeURIComponent(url.username),
+            password: decodeURIComponent(url.password)
+          }
+        : undefined
+    };
+  } catch {
+    return null;
+  }
+}
+
+const DEFAULT_PROXY = parseProxyUrl(DEFAULT_PROXY_URL);
 
 const SCRAPE_ERROR_CODES = {
   CLOUDFLARE: 'CLOUDFLARE_CHALLENGE',
@@ -157,10 +189,12 @@ function buildTimeoutError(source = 'masothue.com') {
 }
 
 async function fetchUpstream(url, config = {}) {
+  const proxy = config.proxy === undefined ? (DEFAULT_PROXY || false) : config.proxy;
   const response = await runWithConcurrencyLimit(() => axios.get(url, {
     headers: config.headers || DEFAULT_HEADERS,
     params: config.params,
     timeout: config.timeout || REQUEST_TIMEOUT_MS,
+    proxy,
     validateStatus: () => true
   }));
 
